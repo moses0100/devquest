@@ -1,0 +1,50 @@
+name: DevQuest CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://devquest:devquest_ci@127.0.0.1:5432/devquest
+      DEVQUEST_ACCESS_KEY: devquest-ci-only-test-key
+      API_KEY: devquest-ci-only-test-key
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: devquest
+          POSTGRES_PASSWORD: devquest_ci
+          POSTGRES_DB: devquest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devquest -d devquest"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run db:migrate
+      - name: Test API against PostgreSQL
+        run: |
+          npm start > /tmp/devquest-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000 > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run test:api

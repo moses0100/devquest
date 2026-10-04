@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: devquest
+      POSTGRES_PASSWORD: devquest_local
+      POSTGRES_DB: devquest
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - devquest-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devquest -d devquest"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  devquest-data:

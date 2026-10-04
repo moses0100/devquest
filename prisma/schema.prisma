@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Goal {
+  id        String   @id @default(uuid())
+  title     String   @db.VarChar(120)
+  category  String   @db.VarChar(40)
+  createdAt DateTime @default(now())
+  tasks     Task[]
+  entries   Entry[]
+}
+
+model Task {
+  id        String   @id @default(uuid())
+  title     String   @db.VarChar(160)
+  status    String   @default("todo") @db.VarChar(16)
+  goalId    String
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([goalId, status])
+}
+
+model Entry {
+  id        String   @id @default(uuid())
+  title     String   @db.VarChar(120)
+  content   String   @db.Text
+  minutes   Int
+  date      String   @db.VarChar(10)
+  goalId    String?
+  goal      Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([goalId])
+}
