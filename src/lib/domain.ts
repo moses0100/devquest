@@ -29,6 +29,13 @@ export function localDate(date = new Date()): string {
 }
 export function applyAction(state: QuestState, raw: Action, newId = crypto.randomUUID(), now = new Date().toISOString()): QuestState {
   const action = actionSchema.parse(raw);
+  // Another tab may have deleted the target since this view was rendered.
+  // Reject stale actions before changing state instead of reporting a successful no-op.
+  if (action.type === "goal.delete" && !state.goals.some(goal => goal.id === action.id)
+    || (action.type === "task.status" || action.type === "task.delete") && !state.tasks.some(task => task.id === action.id)
+    || action.type === "entry.delete" && !state.entries.some(entry => entry.id === action.id)) {
+    throw new Error("ไม่พบรายการ กรุณาโหลดข้อมูลใหม่");
+  }
   switch (action.type) {
     case "goal.create": return { ...state, goals: [{ id: newId, title: action.title, category: action.category, createdAt: now }, ...state.goals] };
     case "goal.delete": return { goals: state.goals.filter(g => g.id !== action.id), tasks: state.tasks.filter(t => t.goalId !== action.id), entries: state.entries.map(e => e.goalId === action.id ? { ...e, goalId: null } : e) };

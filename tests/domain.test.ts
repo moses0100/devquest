@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { actionSchema, applyAction, localDate, seedState, streak } from "../src/lib/domain";
+import { Action, actionSchema, applyAction, localDate, seedState, streak } from "../src/lib/domain";
 
 test("deleting a goal cascades tasks and preserves journal entries", () => {
   const state = seedState();
@@ -23,6 +23,32 @@ test("status transitions preserve task identity", () => {
   const next = applyAction(state, { type: "task.status", id, status: "done" });
   assert.equal(next.tasks.find(t => t.id === id)?.status, "done");
   assert.equal(next.tasks.length, state.tasks.length);
+});
+
+test("stale updates and deletions reject without modifying the current snapshot", () => {
+  const state = seedState();
+  const before = structuredClone(state);
+  const missingId = "d0000000-0000-4000-8000-000000000001";
+  const actions: Action[] = [
+    { type: "goal.delete", id: missingId },
+    { type: "task.status", id: missingId, status: "done" },
+    { type: "task.delete", id: missingId },
+    { type: "entry.delete", id: missingId },
+  ];
+  for (const action of actions) {
+    assert.throws(() => applyAction(state, action), /ไม่พบรายการ/);
+    assert.deepEqual(state, before);
+  }
+});
+
+test("a task removed by another tab cannot later be marked done", () => {
+  const original = seedState();
+  const id = original.tasks[0].id;
+  const current = applyAction(original, { type: "task.delete", id });
+  assert.throws(() => applyAction(current, { type: "task.status", id, status: "done" }), /โหลดข้อมูลใหม่/);
+  assert.equal(current.tasks.length, original.tasks.length - 1);
+  const entryId = current.entries[0].id;
+  assert.equal(applyAction(current, { type: "entry.delete", id: entryId }).entries.length, 0);
 });
 test("streak counts distinct consecutive days and allows yesterday", () => {
   const sample = seedState().entries[0];
