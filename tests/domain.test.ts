@@ -1,6 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Action, actionSchema, applyAction, localDate, seedState, streak } from "../src/lib/domain";
+import { Action, actionSchema, applyAction, localDate, seedState, stateSchema, streak } from "../src/lib/domain";
+
+test("saved snapshots reject duplicate identities in each collection", () => {
+  for (const collection of ["goals", "tasks", "entries"] as const) {
+    const state = seedState();
+    const duplicate = { ...state, [collection]: [...state[collection], state[collection][0]] };
+    const result = stateSchema.safeParse(duplicate);
+    assert.equal(result.success, false, collection);
+    if (!result.success) assert.deepEqual(result.error.issues[0].path, [collection, state[collection].length, "id"]);
+  }
+});
+
+test("saved snapshots reject orphan tasks and linked journal entries", () => {
+  for (const collection of ["tasks", "entries"] as const) {
+    const state = seedState();
+    state[collection][0].goalId = "d0000000-0000-4000-8000-000000000001";
+    const before = structuredClone(state);
+    const result = stateSchema.safeParse(state);
+    assert.equal(result.success, false, collection);
+    if (!result.success) assert.deepEqual(result.error.issues[0].path, [collection, 0, "goalId"]);
+    assert.deepEqual(state, before);
+  }
+});
+
+test("valid snapshots allow unlinked journal entries and normal goal deletion", () => {
+  const state = seedState();
+  assert.equal(stateSchema.safeParse(state).success, true);
+  const next = applyAction(state, { type: "goal.delete", id: state.goals[0].id });
+  assert.equal(stateSchema.safeParse(next).success, true);
+  assert.equal(next.entries[0].goalId, null);
+  assert.equal(stateSchema.safeParse({ goals: [], tasks: [], entries: [] }).success, true);
+});
 
 test("deleting a goal cascades tasks and preserves journal entries", () => {
   const state = seedState();

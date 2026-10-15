@@ -23,6 +23,21 @@ export const stateSchema = z.object({
   goals: z.array(z.object({ id, title: title(120), category: title(40), createdAt: z.iso.datetime() })),
   tasks: z.array(z.object({ id, title: title(160), status: z.enum(statuses), goalId: id, createdAt: z.iso.datetime() })),
   entries: z.array(z.object({ id, title: title(120), content: title(4000), minutes: z.number().int().min(1).max(1440), date: dateSchema, goalId: id.nullable(), createdAt: z.iso.datetime() })),
+}).superRefine((state, context) => {
+  // Validate the snapshot as a whole before displaying or changing persisted data.
+  for (const collection of ["goals", "tasks", "entries"] as const) {
+    const seen = new Set<string>();
+    state[collection].forEach((record, index) => {
+      if (seen.has(record.id)) context.addIssue({ code: "custom", path: [collection, index, "id"], message: "พบรหัสรายการซ้ำ กรุณาตรวจข้อมูลที่บันทึกไว้" });
+      seen.add(record.id);
+    });
+  }
+  const goalIds = new Set(state.goals.map(goal => goal.id));
+  for (const collection of ["tasks", "entries"] as const) {
+    state[collection].forEach((record, index) => {
+      if (record.goalId !== null && !goalIds.has(record.goalId)) context.addIssue({ code: "custom", path: [collection, index, "goalId"], message: "ไม่พบเป้าหมายของรายการ กรุณาตรวจข้อมูลที่บันทึกไว้" });
+    });
+  }
 });
 export function localDate(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
