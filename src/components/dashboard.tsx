@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowDownToLine, ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, CircleCheck, Code2, Flame, LayoutDashboard, ListTodo, LoaderCircle, MoreHorizontal, Plus, Search, Settings2, Sparkles, Target, Trash2, X, Zap } from "lucide-react";
 import { Action, Entry, Goal, QuestState, Status, actionSchema, applyAction, localDate, seedState, stateSchema, streak } from "@/lib/domain";
+import { parseSavedState } from "@/lib/storage";
 
 type View = "dashboard" | "goals" | "tasks" | "journal";
 type Modal = "goal" | "task" | "entry" | "settings" | null;
@@ -43,8 +44,8 @@ export default function Dashboard() {
         if (databaseMode) loaded = await fetchState();
         else {
           const saved = localStorage.getItem(STORAGE_KEY);
-          loaded = saved ? stateSchema.parse(JSON.parse(saved)) : seedState();
-          if (!saved) localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
+          loaded = saved === null ? seedState() : parseSavedState(saved);
+          if (saved === null) localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
         }
         if (active) { setState(loaded); setReady(true); }
       } catch {
@@ -53,11 +54,15 @@ export default function Dashboard() {
     }
     void load();
     function sync(event: StorageEvent) {
-      if (!databaseMode && event.key === STORAGE_KEY && event.newValue) {
+      if (!databaseMode && event.storageArea === localStorage && (event.key === STORAGE_KEY || event.key === null)) {
         try {
-          const parsed = stateSchema.safeParse(JSON.parse(event.newValue));
-          if (parsed.success) setState(parsed.data);
-        } catch { setError("ข้อมูลจากอีกแท็บไม่ถูกต้อง กรุณาโหลดหน้าใหม่"); }
+          setState(parseSavedState(event.newValue));
+          setReady(true);
+          setError("");
+        } catch {
+          setReady(false);
+          setError("ข้อมูลจากอีกแท็บถูกลบหรือไม่ถูกต้อง กรุณาโหลดหน้าใหม่ก่อนบันทึก");
+        }
       }
     }
     window.addEventListener("storage", sync);
@@ -83,7 +88,7 @@ export default function Dashboard() {
       } else {
         // Read the latest persisted snapshot to preserve updates made in another tab.
         const saved = localStorage.getItem(STORAGE_KEY);
-        const current = saved ? stateSchema.parse(JSON.parse(saved)) : state;
+        const current = parseSavedState(saved);
         const next = applyAction(current, action);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         setState(next);
