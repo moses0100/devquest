@@ -90,3 +90,30 @@ test("streak counts distinct consecutive days and allows yesterday", () => {
   assert.equal(streak([{ ...sample, date: "2026-09-29" }], today), 0);
   assert.equal(localDate(today), "2026-10-03");
 });
+
+
+test("UUID actions match saved identities regardless of letter case", () => {
+  const state = seedState();
+  const taskId = state.tasks[0].id;
+  const updated = applyAction(state, { type: "task.status", id: taskId.toUpperCase(), status: "doing" });
+  assert.equal(updated.tasks.find(task => task.id === taskId)?.status, "doing");
+  const deleted = applyAction(state, { type: "goal.delete", id: state.goals[0].id.toUpperCase() });
+  assert.equal(deleted.goals.length, 1);
+  assert.ok(deleted.tasks.every(task => task.goalId !== state.goals[0].id));
+  assert.equal(deleted.entries[0].goalId, null);
+});
+
+test("loaded UUIDs normalize before relationship and duplicate checks", () => {
+  const state = seedState();
+  const mixed = structuredClone(state);
+  mixed.goals[0].id = mixed.goals[0].id.toUpperCase();
+  mixed.tasks[0].id = mixed.tasks[0].id.toUpperCase();
+  mixed.entries[0].goalId = mixed.entries[0].goalId!.toUpperCase();
+  assert.deepEqual(stateSchema.parse(mixed), state);
+  assert.equal(mixed.goals[0].id, state.goals[0].id.toUpperCase());
+  for (const collection of ["goals", "tasks", "entries"] as const) {
+    const original = state[collection][0];
+    const duplicate = { ...state, [collection]: [...state[collection], { ...original, id: original.id.toUpperCase() }] };
+    assert.equal(stateSchema.safeParse(duplicate).success, false, collection);
+  }
+});

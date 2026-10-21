@@ -33,6 +33,8 @@ async function main() {
     assert.ok(goalId);
     await send({ type: "task.create", title, goalId });
     const taskId = (await read()).tasks.find(t => t.goalId === goalId)!.id;
+    await send({ type: "task.status", id: taskId.toUpperCase(), status: "doing" });
+    assert.equal((await read()).tasks.find(t => t.id === taskId)?.status, "doing");
     await send({ type: "task.status", id: taskId, status: "done" });
     assert.equal((await read()).tasks.find(t => t.id === taskId)?.status, "done");
     await send({ type: "entry.create", title, content: "Integration test entry", minutes: 25, date: "2026-10-03", goalId });

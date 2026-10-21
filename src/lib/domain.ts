@@ -7,7 +7,8 @@ export type Task = { id: string; title: string; status: Status; goalId: string; 
 export type Entry = { id: string; title: string; content: string; minutes: number; date: string; goalId: string | null; createdAt: string };
 export type QuestState = { goals: Goal[]; tasks: Task[]; entries: Entry[] };
 const title = (max: number) => z.string().trim().min(1, "กรุณากรอกข้อความ").max(max, `ไม่เกิน ${max} ตัวอักษร`);
-const id = z.uuid();
+// PostgreSQL UUIDs are case-insensitive; use the same identity in demo snapshots.
+const id = z.uuid().toLowerCase();
 export const dateSchema = z.iso.date();
 export const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("goal.create"), title: title(120), category: title(40) }),
