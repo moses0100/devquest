@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowDownToLine, ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, CircleCheck, Code2, Flame, LayoutDashboard, ListTodo, LoaderCircle, MoreHorizontal, Plus, Search, Settings2, Sparkles, Target, Trash2, X, Zap } from "lucide-react";
 import { Action, Entry, Goal, QuestState, Status, actionSchema, applyAction, localDate, seedState, stateSchema, streak } from "@/lib/domain";
 import { parseSavedState } from "@/lib/storage";
+import { downloadJson } from "@/lib/download";
 
 type View = "dashboard" | "goals" | "tasks" | "journal";
 type Modal = "goal" | "task" | "entry" | "settings" | null;
@@ -113,8 +114,7 @@ export default function Dashboard() {
   }
 
   function exportData() {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `devquest-${localDate()}.json`; anchor.click(); URL.revokeObjectURL(url);
+    downloadJson(state, `devquest-${localDate()}.json`);
     setNotice("ส่งออกข้อมูลแล้ว");
   }
   async function connect() {
